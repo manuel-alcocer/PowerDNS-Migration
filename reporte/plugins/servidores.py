@@ -27,6 +27,6 @@ def obtener_lista(fichero, contrasenyas,etiqueta):
 def init(config, opciones):
     fichero_hosts = config['DEFAULT']['fichero_hosts']
     fichero_pass = config['DEFAULT']['fichero_pass']
-    servidores = obtener_lista(fichero_hosts, fichero_pass, opciones[0])
+    servidores = obtener_lista(fichero_hosts, fichero_pass, opciones['tag'])
     
     return servidores

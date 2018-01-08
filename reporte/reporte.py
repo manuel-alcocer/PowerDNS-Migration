@@ -6,6 +6,7 @@ from sys import argv, exit
 
 import plugins.loadconf
 import plugins.servidores
+import plugins.manager
 
 def ayuda():
     print('''
@@ -35,27 +36,19 @@ def leer_opciones(config):
             plugin = argumento
         elif opcion == '-o':
             opciones_plugin = argumento
+    opciones = {
+                 'tag' : tag,
+                 'plugin' : plugin,
+                 'opts' : opciones_plugin,
+                }
 
-    return [tag, plugin, opciones_plugin]
-
-def aplica_plugin(plugin, db, servidores):
-    if plugin == 'discos':
-        result = plugins.discos.espacio_discos(db, servidores)
-    elif plugin == 'servidores':
-        result = plugins.poblar_servidores(db, servidores)
-    elif plugin == 'database':
-        result = plugins.database.check_db(db)
-    return result
-
-def gestion_opciones(opciones):
-    servidores = obtener_lista(fichero, contrasenyas, opciones[0])
-    result = aplica_plugin(opciones[1], database, servidores)
-    return result
+    return opciones
 
 def main():
     config = plugins.loadconf.load_config()
     opciones = leer_opciones(config)
     servidores = plugins.servidores.init(config, opciones)
+    result = plugins.manager.run(config, opciones, servidores)
 
     # result = gestion_opciones(opciones)
 
