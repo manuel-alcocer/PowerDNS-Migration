@@ -1,7 +1,7 @@
 from subprocess import check_output
 from re import compile as C, IGNORECASE, match
 
-import plugins
+import plugins.database
 
 TABLAS = {}
 
@@ -22,9 +22,9 @@ TABLAS['discos'] = (
 
 def initDB(database):
     tablas = TABLAS
-    result = plugins.comprobar_tabla(database, 'discos')
+    result = plugins.database.comprobar_tabla(database, 'discos')
     if not result:
-        plugins.crear_tablas(database, tablas)
+        plugins.database.crear_tablas(database, tablas)
 
 def comprueba_fila(linea):
     patron_disco = '/dev/[hsv]d[a-z][0-9]+'
@@ -62,7 +62,7 @@ def obtener_datos(db, servidores):
                              'tabla' : 'discos',
                              'inserciones' : extrae_campos(servidor, datos)
                            }
-        plugins.inserta_datos(db, datos_a_insertar)
+        plugins.database.inserta_datos(db, datos_a_insertar)
     return True
 
 def espacio_discos(db, servidores):
