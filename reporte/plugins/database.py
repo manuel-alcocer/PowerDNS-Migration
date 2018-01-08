@@ -61,13 +61,15 @@ def inserta_datos(db, datos):
     cnx = abre_conexion(db)
     cursor = cnx.cursor()
     for insercion in lista[1]:
-        DML = '''INSERT INTO "{}" {} VALUES {};'''.format(datos['tabla'], lista[0][0], insercion)
+        campos = '{}'.format(lista[0][0]).replace("'",'`')
+        valores = '{}'.format(insercion)
+        DML = 'INSERT INTO `%s` %s VALUES %s;'%(datos['tabla'], campos, valores)
         print(DML)
         cursor.execute(DML)
     cursor.close()
     cnx.close()
 
-def check_database(db):
+def check_db(db):
     tablas_princ = TABLAS
     try:
         cnx = connect(user=db['user'], password=db['pass'],
@@ -96,6 +98,7 @@ def check_database(db):
             crear_tablas(db, tablas_princ)
         else:
             print('Existe la tabla servidores')
+        return True
 
 if __name__ == '__main__':
     main()

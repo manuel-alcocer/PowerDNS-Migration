@@ -5,8 +5,8 @@ from yaml import dump as dyml, load as lyml
 from getopt import getopt, GetoptError
 from sys import argv, exit
 
-from plugins.database import check_database
-from plugins.espacio_discos import espacio_discos, initDB
+import plugins.database
+import plugins.discos
 
 FICHERO = '/home/manuel/gitlab/ansible_playbooks/utils/hosts_inventory.yml'
 CONTRASENYAS = '/home/manuel/gitlab/ansible_playbooks/utils/group_vars/all'
@@ -26,6 +26,8 @@ def ayuda():
     print('''
         -t TAG          Etiqueta (default: %s)
         -p plugin       Plugin a usar (defecto: %s)
+                        Lista: espacio_discos,poblar_servidores, check_db
+        -o opciones     Opciones del plugin
 ''' %(DEFAULTTAG, DEFAULTPLUGIN))
 
 def unir_listas(servidores, passwords, etiqueta):
@@ -55,7 +57,7 @@ def obtener_lista(fichero, contrasenyas,etiqueta):
 def leer_parametros():
     database = BBDD
     try:
-        opts, args = getopt(argv[1:], 'hct:p:')
+        opts, args = getopt(argv[1:], 'ho:t:p:')
     except GetoptError as err:
         ayuda()
         exit(2)
@@ -70,27 +72,32 @@ def leer_parametros():
             etiqueta = argumento
         elif opcion == '-p':
             plugin = argumento
-        elif opcion == '-c':
-            check_database(database)
-            exit(0)
+        elif opcion == '-o':
+            opciones_plugin = argumento
 
     return [etiqueta, plugin]
 
 def aplica_plugin(plugin, db, servidores):
     if plugin == 'espacio_discos':
-        result = espacio_discos(db, servidores)
-        return result
+        result = plugins.discos.espacio_discos(db, servidores)
+    elif plugin == 'poblar_servidores':
+        result = plugins.poblar_servidores(db, servidores)
+    elif plugin == 'check_db':
+        result = plugins.database.check_db(db)
+    return result
 
-def main():
+def gestion_opciones(opciones):
     database = BBDD
-    opciones = leer_parametros()
-
     fichero = FICHERO
     contrasenyas = CONTRASENYAS
-
     servidores = obtener_lista(fichero, contrasenyas, opciones[0])
-
     result = aplica_plugin(opciones[1], database, servidores)
+    return result
+
+def main():
+    opciones = leer_parametros()
+    result = gestion_opciones(opciones)
+
     if not result:
         print('Errores en la ejecución del plugin: %s'%opciones[1])
     else:
