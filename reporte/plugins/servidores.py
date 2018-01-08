@@ -28,5 +28,5 @@ def init(config, opciones):
     fichero_hosts = config['DEFAULT']['fichero_hosts']
     fichero_pass = config['DEFAULT']['fichero_pass']
     servidores = obtener_lista(fichero_hosts, fichero_pass, opciones['tag'])
-    
+
     return servidores
