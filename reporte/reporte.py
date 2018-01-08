@@ -38,7 +38,7 @@ def leer_opciones(config):
     opciones = {
                  'tag' : tag,
                  'plugin' : plugin,
-                 'opts' : opciones_plugin,
+                 'plugin_opts' : opciones_plugin,
                 }
 
     return opciones
@@ -47,6 +47,11 @@ def main():
     config = plugins.loadconf.load_config()
     opciones = leer_opciones(config)
     servidores = plugins.servidores.init(config, opciones)
+    data = {
+             'config' : config,
+             'opts' : opciones,
+             'servers' : servers
+            }
     #result = plugins.manager.run(config, opciones, servidores)
 
     result = True

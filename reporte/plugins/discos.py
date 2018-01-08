@@ -72,8 +72,12 @@ def espacio_discos(db, servidores):
 
 def ssh_cmd(comando, servidor):
     sshcommand = ("sshpass -p '%s' ssh -p%s %s@%s '%s'"
-                    %(servidor['pass'], servidor['port'], servidor['user'], servidor['host'], comando))
+                  %(servidor['pass'], servidor['port'], servidor['user'], servidor['host'], comando))
     return sshcommand
+
+def run(data):
+    if data['opts']['plugin_opts'] = 'espacio':
+        espacio_discos(data['config']['database'], data['servers'])
 
 def main():
     pass

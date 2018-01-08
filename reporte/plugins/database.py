@@ -100,5 +100,12 @@ def check_db(db):
             print('Existe la tabla servidores')
         return True
 
+def run(data):
+    # función a realizar viene dentro de data
+    exec_
+    if data['opts']['plugin_opts']['exec'] == 'check_db':
+        # comprueba la conexión de la db
+        pass
+    elif data
 if __name__ == '__main__':
     main()

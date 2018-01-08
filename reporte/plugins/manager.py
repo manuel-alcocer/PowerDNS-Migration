@@ -3,14 +3,14 @@ import plugins.database
 import plugins.discos
 import plugins.servidores
 
-def run(config, opciones, servidores):
+def run(data):
     db = config['database']['name']
     if opciones['plugin'] == 'discos':
-        result = plugins.discos.espacio_discos(db, servidores)
+        result = plugins.discos.run(data)
     elif opciones['plugin'] == 'servidores':
-        result = plugins.poblar_servidores(db, servidores)
+        result = plugins.servidores.run(data)
     elif opciones['plugin'] == 'database':
-        result = plugins.database.check_db(db)
+        result = plugins.database.run(data)
     return result
 
 def main():
