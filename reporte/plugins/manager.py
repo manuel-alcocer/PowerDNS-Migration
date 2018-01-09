@@ -4,12 +4,12 @@ import plugins.discos
 import plugins.servidores
 
 def run(data):
-    db = config['database']['name']
-    if opciones['plugin'] == 'discos':
+    db = data['config']['database']
+    if data['opts']['plugin'] == 'discos':
         result = plugins.discos.run(data)
-    elif opciones['plugin'] == 'servidores':
+    elif data['opts']['plugin'] == 'servidores':
         result = plugins.servidores.run(data)
-    elif opciones['plugin'] == 'database':
+    elif data['opts']['plugin'] == 'database':
         result = plugins.database.run(data)
     return result
 

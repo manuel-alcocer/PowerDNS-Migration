@@ -76,7 +76,7 @@ def ssh_cmd(comando, servidor):
     return sshcommand
 
 def run(data):
-    if data['opts']['plugin_opts'] = 'espacio':
+    if data['opts']['plugin_opts'] == 'espacio':
         espacio_discos(data['config']['database'], data['servers'])
 
 def main():

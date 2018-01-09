@@ -17,10 +17,9 @@ def ayuda(err=0):
     exit(err)
 
 def leer_opciones(config):
-    tag = config['DEFAULT']['tag']
-    plugin = config['DEFAULT']['plugin']
-    opciones_plugin = ''
-
+    tag = None
+    plugin = None
+    plugin_opts = None
     try:
         opts, args = getopt(argv[1:], 'ht:o:p:')
     except GetoptError as err:
@@ -50,9 +49,9 @@ def main():
     data = {
              'config' : config,
              'opts' : opciones,
-             'servers' : servers
+             'servers' : servidores
             }
-    #result = plugins.manager.run(config, opciones, servidores)
+    result = plugins.manager.run(data)
 
     result = True
     if not result:

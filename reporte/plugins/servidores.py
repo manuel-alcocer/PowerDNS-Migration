@@ -1,5 +1,17 @@
 from yaml import dump as dyml, load as lyml
 
+import plugins.database
+
+TABLAS = {}
+
+TABLAS['servidores'] = (
+        '''CREATE TABLE IF NOT EXISTS `servidores` (
+            `alias` varchar(60) NOT NULL,
+            `hostname` varchar(100) NOT NULL,
+            PRIMARY KEY (`alias`)
+        ) ENGINE=InnoDB'''
+        )
+
 def unir_listas(servidores, passwords, etiqueta):
     lista = []
     servidores = servidores['all']['children'][etiqueta]['hosts']
@@ -30,3 +42,14 @@ def init(config, opciones):
     servidores = obtener_lista(fichero_hosts, fichero_pass, opciones['tag'])
 
     return servidores
+
+def check_db(data):
+    tablas = TABLAS
+    db = data['config']['database']
+    result = plugins.database.comprobar_tabla(db, 'servidores')
+
+def run(data):
+    if data['opts']['plugin_opts'] == 'populate':
+        result = populate(data)
+    elif data['opts']['plugin_opts'] == 'check_db':
+        result = check_db(db, 'servidores')

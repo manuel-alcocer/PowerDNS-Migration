@@ -1,15 +1,5 @@
 from mysql.connector import connect, errorcode, Error
 
-TABLAS = {}
-
-TABLAS['servidores'] = (
-        '''CREATE TABLE IF NOT EXISTS `servidores` (
-            `alias` varchar(60) NOT NULL,
-            `hostname` varchar(100) NOT NULL,
-            PRIMARY KEY (`alias`)
-        ) ENGINE=InnoDB'''
-        )
-
 def abre_conexion(db):
     cnx = connect(user=db['user'], password=db['pass'],
                   host=db['host'], database=db['db'])
@@ -33,7 +23,6 @@ def crear_tablas(db, tablas):
     cnx.close()
 
 def comprobar_tabla(db, tabla):
-    database = db['db']
     cnx = abre_conexion(db)
     cursor = cnx.cursor(dictionary=True)
     query = """SELECT count(*) AS cuenta
@@ -70,7 +59,6 @@ def inserta_datos(db, datos):
     cnx.close()
 
 def check_db(db):
-    tablas_princ = TABLAS
     try:
         cnx = connect(user=db['user'], password=db['pass'],
                       host=db['host'], database=db['db'])
@@ -102,10 +90,8 @@ def check_db(db):
 
 def run(data):
     # función a realizar viene dentro de data
-    exec_
     if data['opts']['plugin_opts']['exec'] == 'check_db':
         # comprueba la conexión de la db
         pass
-    elif data
 if __name__ == '__main__':
     main()
