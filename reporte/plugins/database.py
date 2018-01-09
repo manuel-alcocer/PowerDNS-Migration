@@ -106,6 +106,6 @@ def run(data):
     if data['opts']['plugin_opts']['exec'] == 'check_db':
         # comprueba la conexión de la db
         pass
-    elif data
+
 if __name__ == '__main__':
     main()

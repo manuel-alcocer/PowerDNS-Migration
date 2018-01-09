@@ -50,7 +50,7 @@ def main():
     data = {
              'config' : config,
              'opts' : opciones,
-             'servers' : servers
+             'servers' : servidores
             }
     #result = plugins.manager.run(config, opciones, servidores)
 
