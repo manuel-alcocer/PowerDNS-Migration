@@ -93,5 +93,9 @@ def run(data):
     if data['opts']['plugin_opts']['exec'] == 'check_db':
         # comprueba la conexión de la db
         pass
+<<<<<<< HEAD
+=======
+
+>>>>>>> ac70139e30d9ee915d1d832ee115cc5a56a2f3e4
 if __name__ == '__main__':
     main()
