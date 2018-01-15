@@ -19,7 +19,7 @@ def ayuda(err=0):
 def leer_opciones(config):
     tag = None
     plugin = None
-    plugin_opts = None
+    opciones_plugin = None
     try:
         opts, args = getopt(argv[1:], 'ht:o:p:')
     except GetoptError as err:

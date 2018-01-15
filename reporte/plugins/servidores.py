@@ -12,6 +12,10 @@ TABLAS['servidores'] = (
         ) ENGINE=InnoDB'''
         )
 
+def populate(data):
+    for servidor in data['servidores']:
+
+
 def unir_listas(servidores, passwords, etiqueta):
     lista = []
     servidores = servidores['all']['children'][etiqueta]['hosts']

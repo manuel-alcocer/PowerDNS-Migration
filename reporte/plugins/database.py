@@ -45,18 +45,23 @@ def formatea(datos):
         valores += [tuple(vals)]
     return [columnas, valores]
 
+# esta función coge una lista y la inserta
+# Así:
+# lista = [tabla, [filas]]
+# tabla = 
+# filas = [{clave:valor, clave2:valor, clave3:valor},{...},{...}]
 def inserta_datos(db, datos):
     lista = formatea(datos)
-    cnx = abre_conexion(db)
-    cursor = cnx.cursor()
+    #cnx = abre_conexion(db)
+    #cursor = cnx.cursor()
     for insercion in lista[1]:
         campos = '{}'.format(lista[0][0]).replace("'",'`')
         valores = '{}'.format(insercion)
         DML = 'INSERT INTO `%s` %s VALUES %s;'%(datos['tabla'], campos, valores)
         print(DML)
-        cursor.execute(DML)
-    cursor.close()
-    cnx.close()
+        #cursor.execute(DML)
+    #cursor.close()
+    #cnx.close()
 
 def check_db(db):
     try:
@@ -93,9 +98,6 @@ def run(data):
     if data['opts']['plugin_opts']['exec'] == 'check_db':
         # comprueba la conexión de la db
         pass
-<<<<<<< HEAD
-=======
 
->>>>>>> ac70139e30d9ee915d1d832ee115cc5a56a2f3e4
 if __name__ == '__main__':
     main()
