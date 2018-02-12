@@ -4,13 +4,12 @@ DROP PROCEDURE IF EXISTS mydns2pdns;
 DROP PROCEDURE IF EXISTS recorredominios;
 DROP PROCEDURE IF EXISTS walkdomains;
 DROP FUNCTION IF EXISTS insertdomains;
+DROP FUNCTION IF EXISTS insertzones;
 
 delimiter //
 
-CREATE OR REPLACE FUNCTION insertdomains(domain VARCHAR(255))
-    RETURNS INTEGER DETERMINISTIC
+CREATE OR REPLACE PROCEDURE insertdomains(IN domain VARCHAR(255), OUT targetid INT)
 BEGIN
-    DECLARE targetid INTEGER;
     DECLARE pdnsdomain VARCHAR(255);
 
     SELECT TRIM(TRAILING '.' FROM domain) INTO pdnsdomain;
@@ -26,26 +25,77 @@ BEGIN
     SELECT id FROM pdns.domains
         WHERE name = pdnsdomain
     INTO targetid;
-
-    -- Devuelve el id del domino en la base de datos de PDNS
-    RETURN targetid;
 END
 //
 
-CREATE OR REPLACE FUNCTION insertzones(targetid INTEGER(10))
-    RETURNS INTEGER DETERMINISTIC
+CREATE OR REPLACE PROCEDURE insertzones(IN targetid INT, OUT result INT)
 BEGIN
-    DECLARE total INTEGER DEFAULT 0;
-
-    SELECT COUNT(domain_id) INTO total FROM pdns.zones
+    SELECT COUNT(domain_id) INTO result FROM pdns.zones
         WHERE domain_id = targetid;
 
-    IF total = 0 THEN
+    IF result = 0 THEN
         INSERT INTO pdns.zones (domain_id, owner) VALUES (targetid, 1);
     END IF;
 
-    -- Devuelve 0 si inserta, 1 si no inserta
-    RETURN total;
+END
+//
+
+CREATE OR REPLACE PROCEDURE insertrecord(IN targetid INT,
+                                         IN v_name VARCHAR(255),
+                                         IN v_type VARCHAR(10),
+                                         IN v_content VARCHAR(6400),
+                                         IN v_prio INT(11))
+BEGIN
+
+END
+//
+
+CREATE OR REPLACE PROCEDURE clonerecords(IN sourceid INT,
+                                         IN targetid INT,
+                                         OUT result INT)
+BEGIN
+    DECLARE v_name VARCHAR(255);
+    DECLARE v_type VARCHAR(10);
+    DECLARE v_content VARCHAR(64000);
+    DECLARE v_prio INT(11);
+    DECLARE since_epoch INT;
+    DECLARE v_disabled TINYINT(1);
+
+    DECLARE done INT DEFAULT FALSE;
+
+    DECLARE c_srecords CURSOR FOR
+        SELECT name, type, data, aux
+            FROM furanetdns.rr
+        WHERE zone = sourceid;
+
+        DECLARE CONTINUE HANDLER
+        FOR NOT FOUND SET done = TRUE;
+
+    -- Primero me aseguro que en destino no existe ya ese dominio
+    DELETE FROM pdns.records WHERE domain_id = targetid;
+
+    OPEN c_srecords;
+
+    get_records: LOOP
+        FETCH c_srecords INTO v_name, v_type, v_content, v_prio;
+        IF done THEN
+            LEAVE get_records;
+        END IF;
+
+        IF v_type = 'SOA' THEN
+            CALL insertsoa();
+        ELSE
+            SET since_epoch := SELECT UNIX_TIMESTAMP(NOW());
+
+            INSERT INTO pdns.records (domain_id, name, type, content,
+                                      change_date, auth, disabled, prio)
+                   VALUES (targetid, v_name, v_type, v_content,
+                           since_epoch, 1, 0, v_prio);
+        END IF;
+    END LOOP;
+
+    CLOSE c_srecords;
+
 END
 //
 
@@ -59,9 +109,9 @@ BEGIN
     DECLARE result INTEGER DEFAULT 0;
 
     -- Inserciones en tablas de PDNS
-    SELECT insertdomains(domain) INTO targetid;
-    SELECT insertzones(targetid) INTO result;
-
+    CALL insertdomains(domain, targetid);
+    CALL insertzones(targetid, result);
+    CALL insertrecords(sourceid, soadata, targetid);
 END
 //
 
