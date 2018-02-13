@@ -26,27 +26,6 @@ BEGIN
 END
 //
 
-CREATE OR REPLACE PROCEDURE insertdomains(IN p_domain VARCHAR(255),
-                                          OUT p_targetid INT)
-BEGIN
-    DECLARE v_pdnsdomain_name VARCHAR(255);
-
-    SELECT TRIM(TRAILING '.' FROM p_domain) INTO v_pdnsdomain_name;
-
-    SELECT COUNT(*) FROM pdns.domains
-        WHERE name = v_pdnsdomain_name
-    INTO p_targetid;
-
-    IF p_targetid = 0 THEN
-        INSERT INTO pdns.domains (name,type) VALUES (v_pdnsdomain_name,'MASTER');
-    END IF;
-
-    SELECT id FROM pdns.domains
-        WHERE name = v_pdnsdomain_name
-    INTO p_targetid;
-END
-//
-
 CREATE OR REPLACE PROCEDURE insertzones(IN p_targetid INT,
                                         OUT p_result INT)
 BEGIN
@@ -114,32 +93,15 @@ BEGIN
 END
 //
 
-CREATE OR REPLACE PROCEDURE insertsoa(IN p_domain_id INTEGER,
-                                      IN p_name VARCHAR(255),
-                                      IN p_content VARCHAR(64000),
-                                      IN p_ttl INTEGER,
-                                      IN p_active VARCHAR(2))
-BEGIN
-
-    INSERT
-        INTO pdns.records
-            (domain_id, name, type, content, ttl, prio, change_date, auth)
-        VALUES
-            (p_domain_id, v_pdnsdomain_name, 'SOA', p_content, p_ttl, 0, v_change_date, 1);
-END
-//
-
 CREATE OR REPLACE PROCEDURE clonezone(IN p_sourceid INTEGER,
                                       IN p_domain VARCHAR(255),
                                       IN p_soadata VARCHAR(64000),
                                       IN p_ttl INTEGER,
                                       IN p_active VARCHAR(2))
 BEGIN
-    DECLARE v_targetid INTEGER;
     DECLARE v_result INTEGER DEFAULT 0;
 
     -- Inserciones en tablas de PDNS
-    CALL insertdomains(p_domain, v_targetid);
     CALL insertzones(v_targetid, v_result);
     CALL insertsoa(v_targetid, p_domain, p_soadata, p_ttl, p_active);
     CALL clonerecords(p_sourceid, v_targetid, p_domain, p_soadata, p_ttl, p_active);
@@ -178,12 +140,40 @@ BEGIN
         set v_disabled := 1;
     END IF;
 
+    INSERT
+        INTO pdns.records
+            (domain_id, name, type, content, ttl, prio, change_date, auth)
+        VALUES
+            (, v_pdnsdomain_name, 'SOA', p_content, p_ttl, 0, v_change_date, 1);
+END
+//
+
+CREATE OR REPLACE PROCEDURE insert_domain(IN p_zone_id INTEGER,
+                                          OUT p_domain_id INTEGER)
+BEGIN
+    DECLARE v_name VARCHAR(255);
+
+    SELECT TRIM(TRAILING '.' FROM origin) INTO v_name FROM furanetdns.soa
+        WHERE id = p_zone_id;
+
+    SELECT COUNT(*) INTO p_domain_id FROM pdns.domains
+        WHERE name = v_name;
+
+    IF p_domain_id = 0 THEN
+        INSERT INTO pdns.domains (name,type) VALUES (v_name, 'MASTER');
+    END IF;
+
+    SELECT id INTO p_domain_id FROM pdns.domains
+        WHERE name = v_name;
 END
 //
 
 CREATE OR REPLACE PROCEDURE clone_zone (IN p_zone_id INTEGER)
 BEGIN
-    CALL clone_soa(p_zone_id);
+    DECLARE v_domain_id INTEGER;
+
+    CALL insert_domain(p_zone_id, v_domain_id);
+    CALL clone_soa(p_zone_id, v_domain_id);
 
 END
 //
@@ -211,7 +201,7 @@ BEGIN
 
         set i := i + 1;
 
-        CALL clonezone(v_zone_id);
+        CALL clone_zone(v_zone_id);
 
     END LOOP;
     CLOSE c_domains;
