@@ -11,32 +11,61 @@ USE procedimientos;
 
 delimiter //
 
-CREATE OR REPLACE FUNCTION check_dns_origin (p_origin VARCHAR(255),
-                                             p_name VARCHAR(255))
-    RETURNS VARCHAR(255) DETERMINISTIC
+CREATE OR REPLACE PROCEDURE limpia()
 BEGIN
-    DECLARE v_name VARCHAR(255);
+    DELETE FROM pdns.domains WHERE id > 5;
+    ALTER TABLE pdns.domains AUTO_INCREMENT = 7;
 
-    IF SUBSTR(p_name, -1) = '.' THEN
-        SELECT TRIM(TRAILING '.' FROM p_name) INTO v_name;
-    ELSE
-        SELECT CONCAT(p_name, '.', p_origin) INTO v_name;
-    END IF;
+    DELETE FROM pdns.zones WHERE domain_id > 5;
+    ALTER TABLE pdns.zones AUTO_INCREMENT = 7;
 
-    RETURN v_name;
+    DELETE FROM pdns.records WHERE domain_id > 5;
+    ALTER TABLE pdns.records AUTO_INCREMENT = 7;
 END
 //
 
-CREATE OR REPLACE PROCEDURE clone_records(IN p_zone_id INTEGER,
-                                          IN p_domain_id INTEGER,
-                                          IN p_name VARCHAR(255))
+CREATE OR REPLACE PROCEDURE check_name_record (p_origin VARCHAR(255),
+                                               INOUT p_name VARCHAR(255),
+                                               OUT p_act INTEGER)
 BEGIN
-    DECLARE v_record_name VARCHAR(255);
+    set p_act := 0;
+    IF LENGTH(p_name) = 1 AND p_name = '@' THEN
+        SELECT CONCAT(p_origin, '.') INTO p_name;
+    ELSEIF LENGTH(p_name) = 1 AND p_name = '.' THEN
+        set p_act := 1;
+    END IF;
+
+    IF SUBSTR(p_name, -1) != '.' THEN
+        SELECT CONCAT(p_name, '.', p_origin, '.') INTO p_name;
+    END IF;
+
+    SELECT TRIM(TRAILING '.' FROM p_name) INTO p_name;
+END
+//
+
+CREATE Or REPLACE PROCEDURE check_content (p_type VARCHAR(10),
+                                           p_origin VARCHAR(255),
+                                           INOUT p_content VARCHAR(64000))
+BEGIN
+    DECLARE v_act INTEGER;
+    IF p_type IN ('CNAME', 'NS', 'MX') THEN
+        CALL check_name_record (p_origin, p_content, v_act);
+    END IF;
+END
+//
+
+CREATE OR REPLACE PROCEDURE clone_records (p_zone_id INTEGER,
+                                           p_domain_id INTEGER,
+                                           p_origin VARCHAR(255))
+BEGIN
+    DECLARE v_name VARCHAR(255);
     DECLARE v_type VARCHAR(10);
     DECLARE v_content VARCHAR(64000);
     DECLARE v_prio INTEGER;
     DECLARE v_ttl INTEGER;
     DECLARE v_change_date INTEGER;
+
+    DECLARE v_act INTEGER DEFAULT 0;
 
     DECLARE v_done INT DEFAULT FALSE;
 
@@ -52,24 +81,24 @@ BEGIN
     get_records: LOOP
 
         FETCH c_records
-            INTO v_record_name, v_type, v_content, v_prio, v_ttl, v_change_date;
+            INTO v_name, v_type, v_content, v_prio, v_ttl, v_change_date;
 
         IF v_done THEN
             LEAVE get_records;
         END IF;
 
-        IF LENGTH(v_name) = 0 THEN
-            SELECT TRIM(TRAILING '.' FROM p_domain_name) INTO v_name;
+        CALL check_name (p_origin, v_name, v_act);
+        CALL check_content (v_type, p_origin, v_content);
+
+        IF v_act = 0 THEN
+            INSERT INTO pdns.records (domain_id, name, type, content,
+                                      ttl, prio, change_date)
+                   VALUES (p_domain_id, v_name, v_type, v_content,
+                           v_ttl, v_prio, v_change_date);
         END IF;
 
-        INSERT INTO pdns.records (domain_id, name, type, content,
-                                  change_date, auth, disabled, prio)
-               VALUES (p_targetid, v_name, v_type, v_content,
-                       v_change_date, 1, 0, v_prio);
-
     END LOOP;
-    CLOSE c_srecords;
-
+    CLOSE c_records;
 END
 //
 
@@ -77,8 +106,8 @@ END
  * zone_origin: dominio acabado en '.': example.org.
 */
 
-CREATE OR REPLACE PROCEDURE clone_soa (IN p_zone_id INTEGER,
-                                       IN p_domain_id INTEGER,
+CREATE OR REPLACE PROCEDURE clone_soa (p_zone_id INTEGER,
+                                       p_domain_id INTEGER,
                                        OUT p_name VARCHAR(255))
 BEGIN
     DECLARE v_content VARCHAR(64000);
@@ -105,24 +134,25 @@ BEGIN
         INTO pdns.records
             (domain_id, name, type, content, ttl, prio, change_date, disabled, auth)
         VALUES
-            (p_domaind_id, p_name, 'SOA', v_content, v_ttl, 0, v_change_date, v_disabled, 1);
+            (p_domain_id, p_name, 'SOA', v_content, v_ttl, 0, v_change_date, v_disabled, 1);
 END
 //
 
-CREATE OR REPLACE PROCEDURE insert_zone (IN p_domain_id INTEGER)
+CREATE OR REPLACE PROCEDURE insert_zone (p_domain_id INTEGER)
 BEGIN
     DECLARE v_domain_id INTEGER;
 
-    SELECT domain_id INTO v_domain_id FROM pdns.zones
+    SELECT COUNT(*) INTO v_domain_id FROM pdns.zones
         WHERE domain_id = p_domain_id;
 
-    IF (v_domain_id IS NULL) THEN
-        INSERT INTO pdns.zones (domain_id, owner) VALUES (v_domain_id, 1);
+    select v_domain_id, p_domain_id;
+    IF v_domain_id = 0 THEN
+        INSERT INTO pdns.zones (domain_id, owner) VALUES (p_domain_id, 1);
     END IF;
 END
 //
 
-CREATE OR REPLACE PROCEDURE insert_domain (IN p_zone_id INTEGER,
+CREATE OR REPLACE PROCEDURE insert_domain (p_zone_id INTEGER,
                                            OUT p_domain_id INTEGER)
 BEGIN
     DECLARE v_name VARCHAR(255);
@@ -142,20 +172,19 @@ BEGIN
 END
 //
 
-CREATE OR REPLACE PROCEDURE clone_zone (IN p_zone_id INTEGER)
+CREATE OR REPLACE PROCEDURE clone_zone (p_zone_id INTEGER)
 BEGIN
     DECLARE v_domain_id INTEGER;
     DECLARE v_name VARCHAR(255);
 
     CALL insert_domain (p_zone_id, v_domain_id);
-    CALL insert_zone (v_targetid, v_result);
+    CALL insert_zone (v_domain_id);
     CALL clone_soa (p_zone_id, v_domain_id, v_name);
     CALL clone_records (p_zone_id, v_domain_id, v_name);
-
 END
 //
 
-CREATE OR REPLACE PROCEDURE walk_domains (IN p_limite INT)
+CREATE OR REPLACE PROCEDURE walk_domains (p_limite INT)
 BEGIN
     DECLARE v_zone_id INTEGER;
     DECLARE v_done INT DEFAULT FALSE;
@@ -195,4 +224,4 @@ END
 
 delimiter ;
 
--- call mydns2pdns;
+call mydns2pdns;
