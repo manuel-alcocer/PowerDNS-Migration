@@ -11,7 +11,7 @@ USE procedimientos;
 
 delimiter //
 
-CREATE OR REPLACE FUNCTION checkdnsname(p_origin VARCHAR(255), p_name VARCHAR(255))
+CREATE OR REPLACE FUNCTION checkdnsorigin(p_origin VARCHAR(255), p_name VARCHAR(255))
     RETURNS VARCHAR(255)
 BEGIN
     DECLARE v_name VARCHAR(255);
