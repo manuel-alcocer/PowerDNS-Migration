@@ -12,7 +12,7 @@ USE procedimientos;
 delimiter //
 
 CREATE OR REPLACE FUNCTION checkdnsorigin(p_origin VARCHAR(255), p_name VARCHAR(255))
-    RETURNS VARCHAR(255)
+    RETURNS VARCHAR(255) DETERMINISTIC
 BEGIN
     DECLARE v_name VARCHAR(255);
 
@@ -20,22 +20,22 @@ BEGIN
         SELECT TRIM(TRAILING '.' FROM p_name) INTO v_name;
     ELSE
         SELECT CONCAT(p_name, '.', p_origin) INTO v_name;
-    END IF
+    END IF;
 
     RETURN v_name;
 END
 //
 
-CREATE OR REPLACE PROCEDURE insertzones(IN p_targetid INT,
-                                        OUT p_result INT)
+CREATE OR REPLACE PROCEDURE insert_zone (IN p_domain_id INTEGER)
 BEGIN
-    SELECT COUNT(domain_id) INTO p_result FROM pdns.zones
-        WHERE domain_id = p_targetid;
+    DECLARE v_domain_id INTEGER;
 
-    IF p_result = 0 THEN
-        INSERT INTO pdns.zones (domain_id, owner) VALUES (p_targetid, 1);
+    SELECT domain_id INTO v_domain_id FROM pdns.zones
+        WHERE domain_id = p_domain_id;
+
+    IF (v_domain_id IS NULL) THEN
+        INSERT INTO pdns.zones (domain_id, owner) VALUES (v_domain_id, 1);
     END IF;
-
 END
 //
 
@@ -101,9 +101,6 @@ CREATE OR REPLACE PROCEDURE clonezone(IN p_sourceid INTEGER,
 BEGIN
     DECLARE v_result INTEGER DEFAULT 0;
 
-    -- Inserciones en tablas de PDNS
-    CALL insertzones(v_targetid, v_result);
-    CALL insertsoa(v_targetid, p_domain, p_soadata, p_ttl, p_active);
     CALL clonerecords(p_sourceid, v_targetid, p_domain, p_soadata, p_ttl, p_active);
 END
 //
@@ -144,8 +141,8 @@ BEGIN
 END
 //
 
-CREATE OR REPLACE PROCEDURE insert_domain(IN p_zone_id INTEGER,
-                                          OUT p_domain_id INTEGER)
+CREATE OR REPLACE PROCEDURE insert_domain (IN p_zone_id INTEGER,
+                                           OUT p_domain_id INTEGER)
 BEGIN
     DECLARE v_name VARCHAR(255);
 
@@ -168,14 +165,15 @@ CREATE OR REPLACE PROCEDURE clone_zone (IN p_zone_id INTEGER)
 BEGIN
     DECLARE v_domain_id INTEGER;
 
-    CALL insert_domain(p_zone_id, v_domain_id);
-    CALL clone_soa(p_zone_id, v_domain_id);
-    CALL clone_records(p_zone_id, v_domain_id);
+    CALL insert_domain (p_zone_id, v_domain_id);
+    CALL insert_zone (v_targetid, v_result);
+    CALL clone_soa (p_zone_id, v_domain_id);
+    CALL clone_records (p_zone_id, v_domain_id);
 
 END
 //
 
-CREATE OR REPLACE PROCEDURE walk_domains(IN p_limite INT)
+CREATE OR REPLACE PROCEDURE walk_domains (IN p_limite INT)
 BEGIN
     DECLARE v_zone_id INTEGER;
     DECLARE v_done INT DEFAULT FALSE;
@@ -198,7 +196,7 @@ BEGIN
 
         set i := i + 1;
 
-        CALL clone_zone(v_zone_id);
+        CALL clone_zone (v_zone_id);
 
     END LOOP;
     CLOSE c_domains;
