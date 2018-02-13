@@ -112,29 +112,25 @@ END
  * zone_origin: dominio acabado en '.': example.org.
 */
 
-CREATE OR REPLACE PROCEDURE clone_soa (IN p_zone_id INTEGER)
+CREATE OR REPLACE PROCEDURE clone_soa (IN p_zone_id INTEGER,
+                                       IN p_domain_id INTEGER)
 BEGIN
-    DECLARE v_zone_origin VARCHAR(255);
     DECLARE v_name VARCHAR(255);
-    DECLARE v_soa_data VARCHAR(64000);
+    DECLARE v_content VARCHAR(64000);
     DECLARE v_ttl INTEGER;
-    DECLARE v_active VARCHAR(2);
     DECLARE v_change_date INTEGER;
     DECLARE v_disabled TINYINT(1) DEFAULT 0;
+    DECLARE v_active VARCHAR(2);
 
     -- Primero me aseguro que en destino no existe ya ese dominio
     DELETE FROM pdns.records WHERE domain_id = p_domain_id;
 
-    SELECT origin,
+    SELECT TRIM(TRAILING '.' FROM origin),
            CONCAT_WS(' ', ns, mbox, serial, refresh, retry, expire, minimum, ttl),
-           ttl, active
-    INTO v_zone_origin, v_soa_data, v_ttl, v_active
+           ttl, active, UNIX_TIMESTAMP(NOW())
+    INTO v_name, v_content, v_ttl, v_active, v_change_date
     FROM furanetdns.soa
     WHERE id = p_zone_id;
-
-    SELECT UNIX_TIMESTAMP(NOW()) INTO v_change_date;
-
-    SELECT TRIM(TRAILING '.' FROM v_zone_origin) INTO v_name;
 
     IF v_active = 'N' THEN
         set v_disabled := 1;
@@ -142,9 +138,9 @@ BEGIN
 
     INSERT
         INTO pdns.records
-            (domain_id, name, type, content, ttl, prio, change_date, auth)
+            (domain_id, name, type, content, ttl, prio, change_date, disabled, auth)
         VALUES
-            (, v_pdnsdomain_name, 'SOA', p_content, p_ttl, 0, v_change_date, 1);
+            (p_domaind_id, v_name, 'SOA', v_content, v_ttl, 0, v_change_date, v_disabled, 1);
 END
 //
 
@@ -160,7 +156,7 @@ BEGIN
         WHERE name = v_name;
 
     IF p_domain_id = 0 THEN
-        INSERT INTO pdns.domains (name,type) VALUES (v_name, 'MASTER');
+        INSERT INTO pdns.domains (name, type) VALUES (v_name, 'MASTER');
     END IF;
 
     SELECT id INTO p_domain_id FROM pdns.domains
@@ -174,6 +170,7 @@ BEGIN
 
     CALL insert_domain(p_zone_id, v_domain_id);
     CALL clone_soa(p_zone_id, v_domain_id);
+    CALL clone_records(p_zone_id, v_domain_id);
 
 END
 //
@@ -218,4 +215,4 @@ END
 
 delimiter ;
 
-call mydns2pdns;
+-- call mydns2pdns;
