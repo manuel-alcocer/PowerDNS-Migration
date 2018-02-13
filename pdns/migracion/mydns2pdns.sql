@@ -120,20 +120,6 @@ CREATE OR REPLACE PROCEDURE insertsoa(IN p_domain_id INTEGER,
                                       IN p_ttl INTEGER,
                                       IN p_active VARCHAR(2))
 BEGIN
-    DECLARE v_pdnsdomain_name VARCHAR(255);
-    DECLARE v_change_date INTEGER;
-    DECLARE v_disabled TINYINT(1) DEFAULT 0;
-
-    -- Primero me aseguro que en destino no existe ya ese dominio
-    DELETE FROM pdns.records WHERE domain_id = p_domain_id;
-
-    SELECT UNIX_TIMESTAMP(NOW()) INTO v_change_date;
-
-    SELECT TRIM(TRAILING '.' FROM p_name) INTO v_pdnsdomain_name;
-
-    IF p_active != 'Y' THEN
-        set v_disabled := 1;
-    END IF;
 
     INSERT
         INTO pdns.records
@@ -160,37 +146,72 @@ BEGIN
 END
 //
 
-CREATE OR REPLACE PROCEDURE walkdomains(IN p_limite INT)
+/* zoneid: identificador de zona en origen
+ * zone_origin: dominio acabado en '.': example.org.
+*/
+
+CREATE OR REPLACE PROCEDURE clone_soa (IN p_zone_id INTEGER)
 BEGIN
-    DECLARE v_sourceid INTEGER;
-    DECLARE v_domain VARCHAR(255);
-    DECLARE v_soadata VARCHAR(64000);
-    DECLARE v_finished INT DEFAULT FALSE;
+    DECLARE v_zone_origin VARCHAR(255);
+    DECLARE v_name VARCHAR(255);
+    DECLARE v_soa_data VARCHAR(64000);
     DECLARE v_ttl INTEGER;
     DECLARE v_active VARCHAR(2);
+    DECLARE v_change_date INTEGER;
+    DECLARE v_disabled TINYINT(1) DEFAULT 0;
+
+    -- Primero me aseguro que en destino no existe ya ese dominio
+    DELETE FROM pdns.records WHERE domain_id = p_domain_id;
+
+    SELECT origin,
+           CONCAT_WS(' ', ns, mbox, serial, refresh, retry, expire, minimum, ttl),
+           ttl, active
+    INTO v_zone_origin, v_soa_data, v_ttl, v_active
+    FROM furanetdns.soa
+    WHERE id = p_zone_id;
+
+    SELECT UNIX_TIMESTAMP(NOW()) INTO v_change_date;
+
+    SELECT TRIM(TRAILING '.' FROM v_zone_origin) INTO v_name;
+
+    IF v_active = 'N' THEN
+        set v_disabled := 1;
+    END IF;
+
+END
+//
+
+CREATE OR REPLACE PROCEDURE clone_zone (IN p_zone_id INTEGER)
+BEGIN
+    CALL clone_soa(p_zone_id);
+
+END
+//
+
+CREATE OR REPLACE PROCEDURE walk_domains(IN p_limite INT)
+BEGIN
+    DECLARE v_zone_id INTEGER;
+    DECLARE v_done INT DEFAULT FALSE;
     DECLARE i INTEGER DEFAULT 0;
 
     DECLARE c_domains CURSOR FOR
-        SELECT id, origin,
-               CONCAT_WS(' ', ns, mbox, serial, refresh, retry, expire, minimum, ttl),
-               ttl, active
-        FROM furanetdns.soa;
+        SELECT id FROM furanetdns.soa;
 
     DECLARE CONTINUE HANDLER
-        FOR NOT FOUND SET v_finished = TRUE;
+        FOR NOT FOUND SET v_done = TRUE;
 
     OPEN c_domains;
     get_domains: LOOP
 
-        FETCH c_domains INTO v_sourceid, v_domain, v_soadata, v_ttl, v_active;
+        FETCH c_domains INTO v_zone_id;
 
-        IF v_finished OR i > p_limite THEN
+        IF v_done OR i > p_limite THEN
             LEAVE get_domains;
         END IF;
 
         set i := i + 1;
 
-        CALL clonezone(v_sourceid, v_domain, v_soadata, v_ttl, v_active);
+        CALL clonezone(v_zone_id);
 
     END LOOP;
     CLOSE c_domains;
@@ -200,7 +221,7 @@ END
 
 CREATE OR REPLACE PROCEDURE mydns2pdns()
 BEGIN
-    CALL walkdomains(50);
+    CALL walk_domains(50);
 END
 //
 
