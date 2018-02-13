@@ -31,25 +31,28 @@ CREATE OR REPLACE PROCEDURE clone_records(IN p_zone_id INTEGER,
                                           IN p_domain_id INTEGER,
                                           IN p_name VARCHAR(255))
 BEGIN
-    DECLARE v_name VARCHAR(255);
+    DECLARE v_record_name VARCHAR(255);
     DECLARE v_type VARCHAR(10);
     DECLARE v_content VARCHAR(64000);
-    DECLARE v_prio INT(11);
-    DECLARE v_change_date INT;
+    DECLARE v_prio INTEGER;
+    DECLARE v_ttl INTEGER;
+    DECLARE v_change_date INTEGER;
 
     DECLARE v_done INT DEFAULT FALSE;
 
-    DECLARE c_rr CURSOR FOR
-        SELECT name, type, data, aux FROM furanetdns.rr
+    DECLARE c_records CURSOR FOR
+        SELECT name, type, data, aux, ttl, UNIX_TIMESTAMP(NOW())
+        FROM furanetdns.rr
             WHERE zone = p_zone_id;
 
     DECLARE CONTINUE HANDLER
         FOR NOT FOUND SET v_done = TRUE;
 
-    OPEN c_srecords;
+    OPEN c_records;
     get_records: LOOP
 
-        FETCH c_srecords INTO v_name, v_type, v_content, v_prio;
+        FETCH c_records
+            INTO v_record_name, v_type, v_content, v_prio, v_ttl, v_change_date;
 
         IF v_done THEN
             LEAVE get_records;
@@ -58,8 +61,6 @@ BEGIN
         IF LENGTH(v_name) = 0 THEN
             SELECT TRIM(TRAILING '.' FROM p_domain_name) INTO v_name;
         END IF;
-
-        SELECT UNIX_TIMESTAMP(NOW()) INTO v_change_date;
 
         INSERT INTO pdns.records (domain_id, name, type, content,
                                   change_date, auth, disabled, prio)
