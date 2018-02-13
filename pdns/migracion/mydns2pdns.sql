@@ -11,7 +11,8 @@ USE procedimientos;
 
 delimiter //
 
-CREATE OR REPLACE FUNCTION checkdnsorigin(p_origin VARCHAR(255), p_name VARCHAR(255))
+CREATE OR REPLACE FUNCTION check_dns_origin (p_origin VARCHAR(255),
+                                             p_name VARCHAR(255))
     RETURNS VARCHAR(255) DETERMINISTIC
 BEGIN
     DECLARE v_name VARCHAR(255);
@@ -26,46 +27,24 @@ BEGIN
 END
 //
 
-CREATE OR REPLACE PROCEDURE insert_zone (IN p_domain_id INTEGER)
-BEGIN
-    DECLARE v_domain_id INTEGER;
-
-    SELECT domain_id INTO v_domain_id FROM pdns.zones
-        WHERE domain_id = p_domain_id;
-
-    IF (v_domain_id IS NULL) THEN
-        INSERT INTO pdns.zones (domain_id, owner) VALUES (v_domain_id, 1);
-    END IF;
-END
-//
-
-CREATE OR REPLACE PROCEDURE clonerecords(IN p_sourceid INT,
-                                         IN p_targetid INT,
-                                         IN p_domain_name VARCHAR(255),
-                                         IN p_soadata VARCHAR(64000),
-                                         IN p_ttl INTEGER,
-                                         IN p_active VARCHAR(2))
+CREATE OR REPLACE PROCEDURE clone_records(IN p_zone_id INTEGER,
+                                          IN p_domain_id INTEGER,
+                                          IN p_name VARCHAR(255))
 BEGIN
     DECLARE v_name VARCHAR(255);
     DECLARE v_type VARCHAR(10);
     DECLARE v_content VARCHAR(64000);
     DECLARE v_prio INT(11);
     DECLARE v_change_date INT;
-    DECLARE v_disabled TINYINT(1) DEFAULT 0;
 
     DECLARE v_done INT DEFAULT FALSE;
 
-    DECLARE c_srecords CURSOR FOR
-        SELECT TRIM(TRAILING '.' FROM name), type, data, aux
-            FROM furanetdns.rr
-        WHERE zone = p_sourceid;
+    DECLARE c_rr CURSOR FOR
+        SELECT name, type, data, aux FROM furanetdns.rr
+            WHERE zone = p_zone_id;
 
-        DECLARE CONTINUE HANDLER
+    DECLARE CONTINUE HANDLER
         FOR NOT FOUND SET v_done = TRUE;
-
-    IF p_active != 'Y' THEN
-        set v_disabled := 1;
-    END IF;
 
     OPEN c_srecords;
     get_records: LOOP
@@ -93,26 +72,14 @@ BEGIN
 END
 //
 
-CREATE OR REPLACE PROCEDURE clonezone(IN p_sourceid INTEGER,
-                                      IN p_domain VARCHAR(255),
-                                      IN p_soadata VARCHAR(64000),
-                                      IN p_ttl INTEGER,
-                                      IN p_active VARCHAR(2))
-BEGIN
-    DECLARE v_result INTEGER DEFAULT 0;
-
-    CALL clonerecords(p_sourceid, v_targetid, p_domain, p_soadata, p_ttl, p_active);
-END
-//
-
 /* zoneid: identificador de zona en origen
  * zone_origin: dominio acabado en '.': example.org.
 */
 
 CREATE OR REPLACE PROCEDURE clone_soa (IN p_zone_id INTEGER,
-                                       IN p_domain_id INTEGER)
+                                       IN p_domain_id INTEGER,
+                                       OUT p_name VARCHAR(255))
 BEGIN
-    DECLARE v_name VARCHAR(255);
     DECLARE v_content VARCHAR(64000);
     DECLARE v_ttl INTEGER;
     DECLARE v_change_date INTEGER;
@@ -125,7 +92,7 @@ BEGIN
     SELECT TRIM(TRAILING '.' FROM origin),
            CONCAT_WS(' ', ns, mbox, serial, refresh, retry, expire, minimum, ttl),
            ttl, active, UNIX_TIMESTAMP(NOW())
-    INTO v_name, v_content, v_ttl, v_active, v_change_date
+    INTO p_name, v_content, v_ttl, v_active, v_change_date
     FROM furanetdns.soa
     WHERE id = p_zone_id;
 
@@ -137,7 +104,20 @@ BEGIN
         INTO pdns.records
             (domain_id, name, type, content, ttl, prio, change_date, disabled, auth)
         VALUES
-            (p_domaind_id, v_name, 'SOA', v_content, v_ttl, 0, v_change_date, v_disabled, 1);
+            (p_domaind_id, p_name, 'SOA', v_content, v_ttl, 0, v_change_date, v_disabled, 1);
+END
+//
+
+CREATE OR REPLACE PROCEDURE insert_zone (IN p_domain_id INTEGER)
+BEGIN
+    DECLARE v_domain_id INTEGER;
+
+    SELECT domain_id INTO v_domain_id FROM pdns.zones
+        WHERE domain_id = p_domain_id;
+
+    IF (v_domain_id IS NULL) THEN
+        INSERT INTO pdns.zones (domain_id, owner) VALUES (v_domain_id, 1);
+    END IF;
 END
 //
 
@@ -164,11 +144,12 @@ END
 CREATE OR REPLACE PROCEDURE clone_zone (IN p_zone_id INTEGER)
 BEGIN
     DECLARE v_domain_id INTEGER;
+    DECLARE v_name VARCHAR(255);
 
     CALL insert_domain (p_zone_id, v_domain_id);
     CALL insert_zone (v_targetid, v_result);
-    CALL clone_soa (p_zone_id, v_domain_id);
-    CALL clone_records (p_zone_id, v_domain_id);
+    CALL clone_soa (p_zone_id, v_domain_id, v_name);
+    CALL clone_records (p_zone_id, v_domain_id, v_name);
 
 END
 //
