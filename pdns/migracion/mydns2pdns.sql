@@ -11,6 +11,21 @@ USE procedimientos;
 
 delimiter //
 
+CREATE OR REPLACE FUNCTION checkdnsname(p_origin VARCHAR(255), p_name VARCHAR(255))
+    RETURNS VARCHAR(255)
+BEGIN
+    DECLARE v_name VARCHAR(255);
+
+    IF SUBSTR(p_name, -1) = '.' THEN
+        SELECT TRIM(TRAILING '.' FROM p_name) INTO v_name;
+    ELSE
+        SELECT CONCAT(p_name, '.', p_origin) INTO v_name;
+    END IF
+
+    RETURN v_name;
+END
+//
+
 CREATE OR REPLACE PROCEDURE insertdomains(IN p_domain VARCHAR(255),
                                           OUT p_targetid INT)
 BEGIN
