@@ -120,12 +120,15 @@ BEGIN
     DELETE FROM pdns.records WHERE domain_id = p_domain_id;
 
     SELECT TRIM(TRAILING '.' FROM origin),
-           CONCAT_WS(' ', ns, mbox, serial, refresh, retry, expire, minimum, ttl),
+           CONCAT_WS(' ', TRIM(TRAILING '.' FROM ns),
+                     TRIM(TRAILING '.' FROM mbox),
+                     serial, refresh, retry, expire, minimum),
            ttl, active, UNIX_TIMESTAMP(NOW())
     INTO p_name, v_content, v_ttl, v_active, v_change_date
     FROM furanet.soa
     WHERE id = p_zone_id;
 
+    select v_content;
     IF v_active = 'N' THEN
         set v_disabled := 1;
     END IF;
@@ -172,6 +175,7 @@ END
 //
 
 CREATE OR REPLACE PROCEDURE clone_zone (num INTEGER,
+                                        p_total INTEGER,
                                         p_zone_id INTEGER)
 BEGIN
     DECLARE v_domain_id INTEGER;
@@ -182,7 +186,7 @@ BEGIN
     CALL insert_zone (v_domain_id);
     CALL clone_soa (p_zone_id, v_domain_id, v_name);
     SET insertando := v_name;
-    SELECT num, insertando, v_domain_id;
+    SELECT num, p_total, insertando, v_domain_id;
     CALL clone_records (p_zone_id, v_domain_id, v_name);
 END
 //
@@ -214,11 +218,45 @@ BEGIN
         END IF;
 
         set i := i + 1;
-        CALL clone_zone (i, v_zone_id);
+        CALL clone_zone (i, p_limite, v_zone_id);
 
     END LOOP;
     CLOSE c_domains;
 
+END
+//
+
+CREATE OR REPLACE PROCEDURE clone_patron(p_patron VARCHAR(255))
+BEGIN
+    DECLARE v_done INTEGER DEFAULT FALSE;
+    DECLARE total INTEGER;
+    DECLARE v_id VARCHAR(255);
+    DECLARE num INTEGER DEFAULT 0;
+
+    DECLARE c_search CURSOR FOR
+        SELECT id, (
+                    SELECT COUNT(id) FROM furanet.soa
+                        WHERE origin LIKE p_patron
+                    )
+        FROM furanet.soa
+            WHERE origin LIKE p_patron;
+
+    DECLARE CONTINUE HANDLER
+        FOR NOT FOUND SET v_done = TRUE;
+
+    OPEN c_search;
+
+    walk_result: LOOP
+        FETCH c_search INTO v_id, total;
+        SET num := num + 1;
+        IF v_done THEN
+            LEAVE walk_result;
+        END IF;
+
+        CALL clone_zone(num, total, v_id);
+
+    END LOOP;
+    CLOSE c_search;
 END
 //
 
@@ -229,6 +267,20 @@ END
 //
 
 
-delimiter ;
+DELIMITER ;
 
+USE pdns;
+
+DELIMITER //
+
+CREATE OR REPLACE TRIGGER auto_change_date
+AFTER INSERT OR UPDATE ON records FOR EACH ROW
+BEGIN
+    UPDATE records
+    SET change_date = UNIX_TIMESTAMP(NOW(()))
+    WHERE domain_id = NEW.domain_id;
+END
+//
+
+DELIMITER ;
 -- call mydns2pdns();
