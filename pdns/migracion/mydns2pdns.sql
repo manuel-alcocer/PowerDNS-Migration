@@ -9,7 +9,15 @@
 
 USE procedimientos;
 
+-- Desactivo los TRIGGERS para ganar un poco de velocidad
+-- en la migración
+-- Al final se vuelven a activar
+SET @TRIGGER_CHECKS = FALSE;
+
 delimiter //
+
+/* Procedimiento para reiniciar la migración
+*/
 
 CREATE OR REPLACE PROCEDURE limpia()
 BEGIN
@@ -23,6 +31,12 @@ BEGIN
     ALTER TABLE pdns.records AUTO_INCREMENT = 1;
 END
 //
+
+/* Procedimiento para quitar de forma condicionada
+ * los puntos al final de los registros de tipo TEXTO
+ * Devuelve 1 si considera que no se debe insertar por
+ * estar mal formado
+*/
 
 CREATE OR REPLACE PROCEDURE check_name_record (p_origin VARCHAR(255),
                                                INOUT p_name VARCHAR(255),
@@ -43,6 +57,8 @@ BEGIN
 END
 //
 
+/* Procedimiento que chequea el registro content de PDNS */
+
 CREATE Or REPLACE PROCEDURE check_content (p_type VARCHAR(10),
                                            p_origin VARCHAR(255),
                                            INOUT p_content VARCHAR(64000))
@@ -54,6 +70,9 @@ BEGIN
 END
 //
 
+/* Procedimiento que pasa los registros de un id de origen
+ * a un domain_id de destino
+ */
 CREATE OR REPLACE PROCEDURE clone_records (p_zone_id INTEGER,
                                            p_domain_id INTEGER,
                                            p_origin VARCHAR(255))
@@ -106,6 +125,7 @@ END
  * zone_origin: dominio acabado en '.': example.org.
 */
 
+/* Clonado del registro SOA */
 CREATE OR REPLACE PROCEDURE clone_soa (p_zone_id INTEGER,
                                        p_domain_id INTEGER,
                                        OUT p_name VARCHAR(255))
@@ -154,6 +174,8 @@ BEGIN
 END
 //
 
+/* Crea el registro de la zona correspondiente en la tabla DOMAINS */
+
 CREATE OR REPLACE PROCEDURE insert_domain (p_zone_id INTEGER,
                                            OUT p_domain_id INTEGER)
 BEGIN
@@ -174,6 +196,7 @@ BEGIN
 END
 //
 
+/* Dado un identificador de zona de origen, lo clona completo en PDNS */
 CREATE OR REPLACE PROCEDURE clone_zone (num INTEGER,
                                         p_total INTEGER,
                                         p_zone_id INTEGER)
@@ -191,6 +214,7 @@ BEGIN
 END
 //
 
+/* Recorre todas las zonas de origen */
 CREATE OR REPLACE PROCEDURE walk_domains (INOUT p_limite INT)
 BEGIN
     DECLARE v_zone_id INTEGER;
@@ -226,6 +250,7 @@ BEGIN
 END
 //
 
+/* clona los registros que cumplan con un patron dado en formato SQL LIKE */
 CREATE OR REPLACE PROCEDURE clone_patron(p_patron VARCHAR(255))
 BEGIN
     DECLARE v_done INTEGER DEFAULT FALSE;
@@ -266,21 +291,36 @@ BEGIN
 END
 //
 
-
 DELIMITER ;
 
 USE pdns;
 
 DELIMITER //
 
-CREATE OR REPLACE TRIGGER auto_change_date
-AFTER INSERT OR UPDATE ON records FOR EACH ROW
+-- Trigger para tener actualizado el change_date en caso de inserción
+CREATE OR REPLACE TRIGGER insert_change_date
+BEFORE INSERT ON records FOR EACH ROW
 BEGIN
-    UPDATE records
-    SET change_date = UNIX_TIMESTAMP(NOW(()))
-    WHERE domain_id = NEW.domain_id;
+    SET NEW.change_date = UNIX_TIMESTAMP(NOW());
+END
+//
+
+-- Trigger para tener actualizado el change_date en caso de actualización
+CREATE OR REPLACE TRIGGER update_change_date
+BEFORE UPDATE ON records FOR EACH ROW
+BEGIN
+    SET NEW.change_date = UNIX_TIMESTAMP(NOW());
 END
 //
 
 DELIMITER ;
--- call mydns2pdns();
+
+-- Clona 25 registros
+-- call mydns2pdns(25);
+
+-- Clona todos registros
+-- call mydns2pdns(0);
+
+-- Vuelvo a activar los triggers
+SET @TRIGGER_CHECKS = TRUE;
+
