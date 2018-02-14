@@ -48,7 +48,7 @@ CREATE Or REPLACE PROCEDURE check_content (p_type VARCHAR(10),
                                            INOUT p_content VARCHAR(64000))
 BEGIN
     DECLARE v_act INTEGER;
-    IF p_type IN ('CNAME', 'NS', 'MX') THEN
+    IF p_type IN ('CNAME', 'NS', 'MX', 'PTR') THEN
         CALL check_name_record (p_origin, p_content, v_act);
     END IF;
 END
@@ -171,7 +171,8 @@ BEGIN
 END
 //
 
-CREATE OR REPLACE PROCEDURE clone_zone (p_zone_id INTEGER)
+CREATE OR REPLACE PROCEDURE clone_zone (num INTEGER,
+                                        p_zone_id INTEGER)
 BEGIN
     DECLARE v_domain_id INTEGER;
     DECLARE v_name VARCHAR(255);
@@ -181,7 +182,7 @@ BEGIN
     CALL insert_zone (v_domain_id);
     CALL clone_soa (p_zone_id, v_domain_id, v_name);
     SET insertando := v_name;
-    SELECT insertando, v_domain_id;
+    SELECT num, insertando, v_domain_id;
     CALL clone_records (p_zone_id, v_domain_id, v_name);
 END
 //
@@ -213,7 +214,7 @@ BEGIN
         END IF;
 
         set i := i + 1;
-        CALL clone_zone (v_zone_id);
+        CALL clone_zone (i, v_zone_id);
 
     END LOOP;
     CLOSE c_domains;
