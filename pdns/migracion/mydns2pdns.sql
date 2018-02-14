@@ -21,6 +21,7 @@ delimiter //
 
 CREATE OR REPLACE PROCEDURE limpia()
 BEGIN
+
     DELETE FROM pdns.domains;
     ALTER TABLE pdns.domains AUTO_INCREMENT = 1;
 
@@ -57,6 +58,18 @@ BEGIN
 END
 //
 
+CREATE OR REPLACE PROCEDURE check_txt_record (INOUT p_content VARCHAR(64000))
+BEGIN
+    IF SUBSTR(p_content, 1, 1) != '\"' THEN
+        SELECT CONCAT('\"', p_content) INTO p_content;
+    END IF;
+
+    IF SUBSTR(p_content, -1 ,1) != '\"' THEN
+        SELECT CONCAT(p_content, '\"') INTO p_content;
+    END IF;
+END
+//
+
 /* Procedimiento que chequea el registro content de PDNS */
 
 CREATE Or REPLACE PROCEDURE check_content (p_type VARCHAR(10),
@@ -66,6 +79,8 @@ BEGIN
     DECLARE v_act INTEGER;
     IF p_type IN ('CNAME', 'NS', 'MX', 'PTR') THEN
         CALL check_name_record (p_origin, p_content, v_act);
+    ELSEIF p_type = 'TXT' THEN
+        CALL check_txt_record (p_content);
     END IF;
 END
 //
@@ -323,4 +338,6 @@ DELIMITER ;
 
 -- Vuelvo a activar los triggers
 SET @TRIGGER_CHECKS = TRUE;
+
+USE procedimientos;
 
