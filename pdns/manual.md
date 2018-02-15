@@ -1,5 +1,5 @@
 # Resincronizar
-https://stackoverflow.com/questions/2366018/how-to-re-sync-the-mysql-db-if-master-and-slave-have-different-database-incase-o
+ttps://stackoverflow.com/questions/2366018/how-to-re-sync-the-mysql-db-if-master-and-slave-have-different-database-incase-o
 # Mejor esto: https://www.howtoforge.com/tutorial/how-to-install-and-configure-galera-cluster-on-ubuntu-1604/
 
 # Instalación de servicios
