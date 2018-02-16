@@ -229,15 +229,27 @@ BEGIN
 END
 //
 
+/* Devuelve 0 si no existe la zona en la BBDD pdns */
+CREATE OR REPLACE PROCEDURE check_if_zone (p_origin
+                                           OUT p_result)
+BEGIN
+    SELECT count(*) INTO p_result
+    FROM pdns.domains
+    WHERE name = TRIM(TRAILING '.' FROM p_origin);
+END
+//
+
 /* Recorre todas las zonas de origen */
 CREATE OR REPLACE PROCEDURE walk_domains (INOUT p_limite INT)
 BEGIN
     DECLARE v_zone_id INTEGER;
     DECLARE v_done INT DEFAULT FALSE;
+    DECLARE v_origin VARCHAR(255);
+    DECLARE v_result INTEGER DEFAULT 0;
     DECLARE i INTEGER DEFAULT 0;
 
     DECLARE c_domains CURSOR FOR
-        SELECT id FROM furanet.soa;
+        SELECT id, origin FROM furanet.soa;
 
     DECLARE CONTINUE HANDLER
         FOR NOT FOUND SET v_done = TRUE;
@@ -250,14 +262,17 @@ BEGIN
     OPEN c_domains;
     get_domains: LOOP
 
-        FETCH c_domains INTO v_zone_id;
+        FETCH c_domains INTO v_zone_id, v_origin;
 
         IF v_done OR i > p_limite THEN
             LEAVE get_domains;
         END IF;
 
         set i := i + 1;
-        CALL clone_zone (i, p_limite, v_zone_id);
+        CALL check_if_zone(v_origin, v_result);
+        IF v_result = 0 THEN
+            CALL clone_zone (i, p_limite, v_zone_id);
+        END IF;
 
     END LOOP;
     CLOSE c_domains;
