@@ -58,6 +58,8 @@ BEGIN
 END
 //
 
+/* los TXT necesitan ir encerrados entre comillas */
+
 CREATE OR REPLACE PROCEDURE check_txt_record (INOUT p_content VARCHAR(64000))
 BEGIN
     IF SUBSTR(p_content, 1, 1) != '\"' THEN
@@ -212,35 +214,45 @@ END
 //
 
 /* Dado un identificador de zona de origen, lo clona completo en PDNS */
-CREATE OR REPLACE PROCEDURE clone_zone (num INTEGER,
-                                        p_total INTEGER,
-                                        p_zone_id INTEGER)
+CREATE OR REPLACE PROCEDURE clone_zone (p_zone_id INTEGER)
 BEGIN
     DECLARE v_domain_id INTEGER;
     DECLARE v_name VARCHAR(255);
-    DECLARE insertando VARCHAR(255);
 
     CALL insert_domain (p_zone_id, v_domain_id);
     CALL insert_zone (v_domain_id);
     CALL clone_soa (p_zone_id, v_domain_id, v_name);
-    SET insertando := v_name;
-    SELECT num, p_total, insertando, v_domain_id;
     CALL clone_records (p_zone_id, v_domain_id, v_name);
 END
 //
 
 /* Devuelve 0 si no existe la zona en la BBDD pdns */
-CREATE OR REPLACE PROCEDURE check_if_zone (p_origin
-                                           OUT p_result)
+CREATE OR REPLACE PROCEDURE check_if_zone (p_origin VARCHAR(255),
+                                           OUT p_result INTEGER)
 BEGIN
+    DECLARE v_mydns_serial INTEGER;
+    DECLARE v_pdns_serial INTEGER;
+
     SELECT count(*) INTO p_result
     FROM pdns.domains
     WHERE name = TRIM(TRAILING '.' FROM p_origin);
+
+    -- si existe en destino, comprueba serials
+    IF p_result > 0 THEN
+        SELECT serial INTO v_mydns_serial
+        FROM furanet.soa
+        where origin = p_origin;
+
+        SELECT REGEXP_REPLACE(content, '(\\S+\\s+){2}(\\S+\\s+).*','\\2')
+            INTO v_pdns_serial
+        FROM pdns.records
+            WHERE name = TRIM(TRAILING '.' FROM p_origin);
+    END IF;
 END
 //
 
 /* Recorre todas las zonas de origen */
-CREATE OR REPLACE PROCEDURE walk_domains (INOUT p_limite INT)
+CREATE OR REPLACE PROCEDURE walk_domains (INOUT p_limit INT)
 BEGIN
     DECLARE v_zone_id INTEGER;
     DECLARE v_done INT DEFAULT FALSE;
@@ -254,8 +266,8 @@ BEGIN
     DECLARE CONTINUE HANDLER
         FOR NOT FOUND SET v_done = TRUE;
 
-    IF p_limite = 0 THEN
-        SELECT COUNT(id) INTO p_limite
+    IF p_limit = 0 THEN
+        SELECT COUNT(id) INTO p_limit
         FROM furanet.soa;
     END IF;
 
@@ -264,14 +276,17 @@ BEGIN
 
         FETCH c_domains INTO v_zone_id, v_origin;
 
-        IF v_done OR i > p_limite THEN
+        IF v_done OR i > p_limit THEN
             LEAVE get_domains;
         END IF;
 
         set i := i + 1;
         CALL check_if_zone(v_origin, v_result);
         IF v_result = 0 THEN
-            CALL clone_zone (i, p_limite, v_zone_id);
+            SELECT i, p_limit, v_origin;
+            CALL clone_zone (v_zone_id);
+        ELSE
+            SELECT 'Saltando', v_origin;
         END IF;
 
     END LOOP;
