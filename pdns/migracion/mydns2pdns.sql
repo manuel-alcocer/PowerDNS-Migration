@@ -109,7 +109,6 @@ BEGIN
         FROM pdns.records
             WHERE name = TRIM(TRAILING '.' FROM p_origin)
             AND type = 'SOA';
-        SELECT v_mydns_serial, v_pdns_serial;
         IF v_mydns_serial > v_pdns_serial THEN
             SET p_result = 2;
         ELSE
@@ -255,16 +254,13 @@ BEGIN
     DECLARE v_result INTEGER DEFAULT 0;
 
     CALL check_if_zone(p_origin, v_result);
-    IF v_result = 0 THEN
-        SELECT 'Saltando', p_origin;
-    ELSE
-        SELECT 'Insertando', p_origin;
-
+    IF v_result <> 0 THEN
         CALL insert_domain (p_zone_id, v_domain_id);
         CALL insert_zone (v_domain_id);
         CALL clone_soa (p_zone_id, v_domain_id, v_name);
         CALL clone_records (p_zone_id, v_domain_id, v_name);
     END IF;
+    SET @result := v_result;
 END
 //
 
@@ -300,7 +296,11 @@ BEGIN
 
         SET i = i + 1;
 
+        SELECT 'Insertando', v_origin;
         CALL clone_zone (v_zone_id, v_origin);
+        IF @result = 0 THEN
+            SELECT 'Se saltó', v_origin;
+        END IF;
 
     END LOOP;
     CLOSE c_domains;
@@ -373,6 +373,18 @@ END
 
 DELIMITER ;
 
+USE furanet;
+
+DELIMITER //
+
+CREATE OR REPLACE TRIGGER update_zone
+AFTER UPDATE ON soa FOR EACH ROW
+BEGIN
+    CALL procedimientos.clone_zone(NEW.id, NEW.origin);
+END
+//
+
+DELIMITER ;
 -- Clona 25 registros
 -- call mydns2pdns(25);
 
