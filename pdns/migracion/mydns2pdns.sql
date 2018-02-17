@@ -5,6 +5,10 @@
     freenode.#birras:   nashgul
     mail:               manuel@alcocer.net
 
+    Si no se quiere que MariaDB haga CASTING de VARCHAR a TEXT:
+
+        set global  sql_mode = 'STRICT_ALL_TABLES';
+
 */
 
 USE procedimientos;
