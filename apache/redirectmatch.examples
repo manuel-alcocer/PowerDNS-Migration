@@ -1,5 +1,0 @@
-# Expresion regular para capturar todo, excepto si contiene la cadena "webmail"
-
-RedirectMatch    301    "^((?!webmail).)*$"       http://www.tutorialmonsters.com/
-
-
