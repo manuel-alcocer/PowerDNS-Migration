@@ -64,7 +64,7 @@ END
 
 /* los TXT necesitan ir encerrados entre comillas */
 
-CREATE OR REPLACE PROCEDURE check_txt_record (INOUT p_content VARCHAR(64000))
+CREATE OR REPLACE PROCEDURE check_txt_record (INOUT p_content TEXT(16000))
 BEGIN
     IF SUBSTR(p_content, 1, 1) != '\"' THEN
         SELECT CONCAT('\"', p_content) INTO p_content;
@@ -80,7 +80,7 @@ END
 
 CREATE Or REPLACE PROCEDURE check_content (p_type VARCHAR(10),
                                            p_origin VARCHAR(255),
-                                           INOUT p_content VARCHAR(64000))
+                                           INOUT p_content TEXT(64000))
 BEGIN
     DECLARE v_act INTEGER;
     IF p_type IN ('CNAME', 'NS', 'MX', 'PTR') THEN
@@ -133,7 +133,7 @@ CREATE OR REPLACE PROCEDURE clone_records (p_zone_id INTEGER,
 BEGIN
     DECLARE v_name VARCHAR(255);
     DECLARE v_type VARCHAR(10);
-    DECLARE v_content VARCHAR(64000);
+    DECLARE v_content TEXT(64000);
     DECLARE v_prio INTEGER;
     DECLARE v_ttl INTEGER;
     DECLARE v_change_date INTEGER;
@@ -184,7 +184,7 @@ CREATE OR REPLACE PROCEDURE clone_soa (p_zone_id INTEGER,
                                        p_domain_id INTEGER,
                                        OUT p_name VARCHAR(255))
 BEGIN
-    DECLARE v_content VARCHAR(64000);
+    DECLARE v_content TEXT(64000);
     DECLARE v_ttl INTEGER;
     DECLARE v_change_date INTEGER;
     DECLARE v_disabled TINYINT(1) DEFAULT 0;
