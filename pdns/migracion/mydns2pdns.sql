@@ -274,7 +274,7 @@ BEGIN
     DECLARE v_zone_id INTEGER;
     DECLARE v_done INT DEFAULT FALSE;
     DECLARE v_origin VARCHAR(255);
-    DECLARE i INTEGER DEFAULT 0;
+    DECLARE v_num INTEGER DEFAULT 0;
 
     DECLARE c_domains CURSOR FOR
         SELECT id, origin FROM furanet.soa
@@ -294,16 +294,17 @@ BEGIN
 
         FETCH c_domains INTO v_zone_id, v_origin;
 
-        IF v_done OR i > p_limit THEN
+        IF v_done OR v_num > p_limit THEN
             LEAVE get_domains;
         END IF;
 
-        SET i = i + 1;
+        SET v_num = v_num + 1;
 
-        SELECT 'Insertando', v_origin;
         CALL clone_zone (v_zone_id, v_origin);
         IF @result = 0 THEN
-            SELECT 'Se saltó', v_origin;
+            SELECT 'Se saltó', v_num, p_limit, v_origin;
+        ELSE
+            SELECT 'Se insertó', v_num, p_limit, v_origin;
         END IF;
 
     END LOOP;
