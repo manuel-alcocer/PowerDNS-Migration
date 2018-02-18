@@ -5,10 +5,6 @@
     freenode.#birras:   nashgul
     mail:               manuel@alcocer.net
 
-    Si no se quiere que MariaDB haga CASTING de VARCHAR a TEXT:
-
-        set global  sql_mode = 'STRICT_ALL_TABLES';
-
 */
 
 USE procedimientos;
@@ -63,7 +59,6 @@ END
 //
 
 /* los TXT necesitan ir encerrados entre comillas */
-
 CREATE OR REPLACE PROCEDURE check_txt_record (INOUT p_content TEXT(16000))
 BEGIN
     IF SUBSTR(p_content, 1, 1) != '\"' THEN
@@ -77,7 +72,6 @@ END
 //
 
 /* Procedimiento que chequea el registro content de PDNS */
-
 CREATE Or REPLACE PROCEDURE check_content (p_type VARCHAR(10),
                                            p_origin VARCHAR(255),
                                            INOUT p_content TEXT(64000))
@@ -269,7 +263,7 @@ END
 //
 
 /* Recorre todas las zonas de origen */
-CREATE OR REPLACE PROCEDURE walk_domains (INOUT p_limit INT)
+CREATE OR REPLACE PROCEDURE walk_domains (p_limit INT)
 BEGIN
     DECLARE v_zone_id INTEGER;
     DECLARE v_done INT DEFAULT FALSE;
@@ -294,7 +288,7 @@ BEGIN
 
         FETCH c_domains INTO v_zone_id, v_origin;
 
-        IF v_done OR v_num > p_limit THEN
+        IF v_done OR v_num >= p_limit THEN
             LEAVE get_domains;
         END IF;
 
@@ -313,8 +307,14 @@ BEGIN
 END
 //
 
+CREATE OR REPLACE PROCEDURE mydns2pdns (p_limit INTEGER)
+BEGIN
+    CALL walk_domains(p_limit);
+END
+//
+
 /* clona los registros que cumplan con un patron dado en formato SQL LIKE */
-CREATE OR REPLACE PROCEDURE clone_patron(p_patron VARCHAR(255))
+CREATE OR REPLACE PROCEDURE clone_pattern (p_pattern VARCHAR(255))
 BEGIN
     DECLARE v_done INTEGER DEFAULT FALSE;
     DECLARE total INTEGER DEFAULT 0;
@@ -324,10 +324,10 @@ BEGIN
     DECLARE c_search CURSOR FOR
         SELECT id, (
                     SELECT COUNT(id) FROM furanet.soa
-                        WHERE origin LIKE p_patron
+                        WHERE origin LIKE p_pattern
                     )
         FROM furanet.soa
-            WHERE origin LIKE p_patron;
+            WHERE origin LIKE p_pattern;
 
     DECLARE CONTINUE HANDLER
         FOR NOT FOUND SET v_done = TRUE;
@@ -348,12 +348,6 @@ BEGIN
 END
 //
 
-CREATE OR REPLACE PROCEDURE mydns2pdns(p_limite INTEGER)
-BEGIN
-    CALL walk_domains(p_limite);
-END
-//
-
 DELIMITER ;
 
 USE pdns;
@@ -364,7 +358,14 @@ DELIMITER //
 CREATE OR REPLACE TRIGGER insert_change_date
 BEFORE INSERT ON records FOR EACH ROW
 BEGIN
-    SET NEW.change_date = UNIX_TIMESTAMP(NOW());
+    DECLARE v_domtype VARCHAR(6);
+    SELECT type INTO v_domtype
+    FROM pdns.domains
+        WHERE id = NEW.domain_id;
+
+    IF v_domtype IN ('MASTER', 'NATIVE') THEN
+        SET NEW.change_date = UNIX_TIMESTAMP(NOW());
+    END IF;
 END
 //
 
@@ -372,7 +373,14 @@ END
 CREATE OR REPLACE TRIGGER update_change_date
 BEFORE UPDATE ON records FOR EACH ROW
 BEGIN
-    SET NEW.change_date = UNIX_TIMESTAMP(NOW());
+    DECLARE v_domtype VARCHAR(6);
+    SELECT type INTO v_domtype
+    FROM pdns.domains
+        WHERE id = NEW.domain_id;
+
+    IF v_domtype IN ('MASTER', 'NATIVE') THEN
+        SET NEW.change_date = UNIX_TIMESTAMP(NOW());
+    END IF;
 END
 //
 
@@ -381,6 +389,13 @@ DELIMITER ;
 USE furanet;
 
 DELIMITER //
+
+CREATE OR REPLACE TRIGGER insert_zone
+AFTER INSERT ON soa FOR EACH ROW
+BEGIN
+    CALL procedimientos.clone_zone(NEW.id, NEW.origin);
+END
+//
 
 CREATE OR REPLACE TRIGGER update_zone
 AFTER UPDATE ON soa FOR EACH ROW
