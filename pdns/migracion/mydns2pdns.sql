@@ -99,7 +99,7 @@ BEGIN
     -- si existe en destino, comprueba serials
     IF p_result > 0 THEN
         SELECT serial INTO v_mydns_serial
-        FROM furanet.soa
+        FROM mydns.soa
         WHERE origin = p_origin;
 
         SELECT IFNULL(REGEXP_REPLACE(content, '(\\S+\\s+){2}(\\S+\\s+).*', '\\2'), 0)
@@ -138,7 +138,7 @@ BEGIN
 
     DECLARE c_records CURSOR FOR
         SELECT name, type, data, aux, ttl, UNIX_TIMESTAMP(NOW())
-        FROM furanet.rr
+        FROM mydns.rr
             WHERE zone = p_zone_id;
 
     DECLARE CONTINUE HANDLER
@@ -193,7 +193,7 @@ BEGIN
                      serial, refresh, retry, expire, minimum),
            ttl, active, UNIX_TIMESTAMP(NOW())
     INTO p_name, v_content, v_ttl, v_active, v_change_date
-    FROM furanet.soa
+    FROM mydns.soa
     WHERE id = p_zone_id;
 
     IF v_active = 'N' THEN
@@ -228,7 +228,7 @@ CREATE OR REPLACE PROCEDURE insert_domain (p_zone_id INTEGER,
 BEGIN
     DECLARE v_name VARCHAR(255);
 
-    SELECT TRIM(TRAILING '.' FROM origin) INTO v_name FROM furanet.soa
+    SELECT TRIM(TRAILING '.' FROM origin) INTO v_name FROM mydns.soa
         WHERE id = p_zone_id;
 
     SELECT COUNT(*) INTO p_domain_id FROM pdns.domains
@@ -271,7 +271,7 @@ BEGIN
     DECLARE v_num INTEGER DEFAULT 0;
 
     DECLARE c_domains CURSOR FOR
-        SELECT id, origin FROM furanet.soa
+        SELECT id, origin FROM mydns.soa
         ORDER BY id;
 
     DECLARE CONTINUE HANDLER
@@ -279,7 +279,7 @@ BEGIN
 
     IF p_limit = 0 THEN
         SELECT COUNT(id) INTO p_limit
-        FROM furanet.soa;
+        FROM mydns.soa;
     END IF;
 
     OPEN c_domains;
@@ -323,10 +323,10 @@ BEGIN
 
     DECLARE c_search CURSOR FOR
         SELECT id, (
-                    SELECT COUNT(id) FROM furanet.soa
+                    SELECT COUNT(id) FROM mydns.soa
                         WHERE origin LIKE p_pattern
                     )
-        FROM furanet.soa
+        FROM mydns.soa
             WHERE origin LIKE p_pattern;
 
     DECLARE CONTINUE HANDLER
@@ -386,7 +386,7 @@ END
 
 DELIMITER ;
 
-USE furanet;
+USE mydns;
 
 DELIMITER //
 
