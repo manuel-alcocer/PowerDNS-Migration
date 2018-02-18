@@ -14,7 +14,7 @@ USE procedimientos;
 -- Al final se vuelven a activar
 SET @TRIGGER_CHECKS = FALSE;
 
-delimiter //
+DELIMITER //
 
 /* Procedimiento para reiniciar la migración
 */
