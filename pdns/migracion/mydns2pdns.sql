@@ -25,8 +25,9 @@ BEGIN
     DELETE FROM pdns.domains;
     ALTER TABLE pdns.domains AUTO_INCREMENT = 1;
 
-    DELETE FROM pdns.zones;
-    ALTER TABLE pdns.zones AUTO_INCREMENT = 1;
+    -- Esta tabla es para powerdns-admin, la comento por ser innecesario
+--     DELETE FROM pdns.zones;
+--     ALTER TABLE pdns.zones AUTO_INCREMENT = 1;
 
     DELETE FROM pdns.records;
     ALTER TABLE pdns.records AUTO_INCREMENT = 1;
@@ -191,7 +192,7 @@ BEGIN
            CONCAT_WS(' ', TRIM(TRAILING '.' FROM ns),
                      TRIM(TRAILING '.' FROM mbox),
                      serial, refresh, retry, expire, minimum),
-           ttl, active, UNIX_TIMESTAMP(NOW())
+                     ttl, active, UNIX_TIMESTAMP(NOW())
     INTO p_name, v_content, v_ttl, v_active, v_change_date
     FROM mydns.soa
     WHERE id = p_zone_id;
@@ -254,7 +255,8 @@ BEGIN
     CALL check_if_zone(p_origin, v_result);
     IF v_result <> 0 THEN
         CALL insert_domain (p_zone_id, v_domain_id);
-        CALL insert_zone (v_domain_id);
+        -- Comento esta llamada porque es innecesario
+--        CALL insert_zone (v_domain_id);
         CALL clone_soa (p_zone_id, v_domain_id, v_name);
         CALL clone_records (p_zone_id, v_domain_id, v_name);
     END IF;
@@ -386,25 +388,26 @@ END
 
 DELIMITER ;
 
-USE mydns;
+-- Comento la creación de triggers, es innecesaria por el momento
+-- USE mydns;
 
-DELIMITER //
-
-CREATE OR REPLACE TRIGGER insert_zone
-AFTER INSERT ON soa FOR EACH ROW
-BEGIN
-    CALL procedimientos.clone_zone(NEW.id, NEW.origin);
-END
-//
-
-CREATE OR REPLACE TRIGGER update_zone
-AFTER UPDATE ON soa FOR EACH ROW
-BEGIN
-    CALL procedimientos.clone_zone(NEW.id, NEW.origin);
-END
-//
-
-DELIMITER ;
+-- DELIMITER //
+-- 
+-- CREATE OR REPLACE TRIGGER insert_zone
+-- AFTER INSERT ON soa FOR EACH ROW
+-- BEGIN
+--     CALL procedimientos.clone_zone(NEW.id, NEW.origin);
+-- END
+-- //
+-- 
+-- CREATE OR REPLACE TRIGGER update_zone
+-- AFTER UPDATE ON soa FOR EACH ROW
+-- BEGIN
+--     CALL procedimientos.clone_zone(NEW.id, NEW.origin);
+-- END
+-- //
+-- 
+-- DELIMITER ;
 -- Clona 25 registros
 -- call mydns2pdns(25);
 
